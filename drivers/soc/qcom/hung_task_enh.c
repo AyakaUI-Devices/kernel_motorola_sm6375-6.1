@@ -48,15 +48,28 @@ struct hung_task_enh_data {
 
 static struct hung_task_enh_data hung_task_enh;
 
+/*
+ * The detect status lives in WALT's per-task data when WALT is built. Without
+ * WALT nothing else uses android_vendor_data1, so keep it in the first byte.
+ */
+static inline u8 *hung_detect_status(struct task_struct *t)
+{
+#if IS_ENABLED(CONFIG_SCHED_WALT)
+	return &((struct walt_task_struct *)t->android_vendor_data1)->hung_detect_status;
+#else
+	return (u8 *)t->android_vendor_data1;
+#endif
+}
+
 void qcom_before_check_tasks(void *ignore, struct task_struct *t, unsigned long timeout,
 							bool *need_check)
 {
-	struct walt_task_struct *wts = (struct walt_task_struct *) t->android_vendor_data1;
+	u8 status = *hung_detect_status(t);
 
 	if ((hung_task_enh.global_detect_mode == HUNG_TASK_MODE_WHITELIST &&
-			wts->hung_detect_status != TASK_IN_WHITELIST) ||
+			status != TASK_IN_WHITELIST) ||
 			(hung_task_enh.global_detect_mode == HUNG_TASK_MODE_BLACKLIST &&
-			wts->hung_detect_status == TASK_IN_BLACKLIST)) {
+			status == TASK_IN_BLACKLIST)) {
 		*need_check = false;
 		return;
 	}
@@ -103,7 +116,6 @@ static int hung_task_handler(struct ctl_table *table, int write,
 {
 	int ret;
 	struct task_struct *task;
-	struct walt_task_struct *wts;
 	int pid_and_val[2] = {-1, -1};
 
 	struct ctl_table tmp = {
@@ -121,9 +133,8 @@ static int hung_task_handler(struct ctl_table *table, int write,
 			ret = -ENOENT;
 			goto unlock_mutex;
 		}
-		wts = (struct walt_task_struct *) task->android_vendor_data1;
 		pid_and_val[0] = hung_task_enh.read_pid;
-		pid_and_val[1] = wts->hung_detect_status;
+		pid_and_val[1] = *hung_detect_status(task);
 		ret = proc_dointvec(&tmp, write, buffer, lenp, ppos);
 		goto put_task;
 	}
@@ -143,14 +154,13 @@ static int hung_task_handler(struct ctl_table *table, int write,
 		goto unlock_mutex;
 	}
 
-	wts = (struct walt_task_struct *) task->android_vendor_data1;
 	if (pid_and_val[1] == 1) {
 		if (hung_task_enh.global_detect_mode == HUNG_TASK_MODE_WHITELIST)
-			wts->hung_detect_status = TASK_IN_WHITELIST;
+			*hung_detect_status(task) = TASK_IN_WHITELIST;
 		else
-			wts->hung_detect_status = TASK_IN_BLACKLIST;
+			*hung_detect_status(task) = TASK_IN_BLACKLIST;
 	} else {
-		wts->hung_detect_status = TASK_DEFAULT;
+		*hung_detect_status(task) = TASK_DEFAULT;
 	}
 
 put_task:

@@ -64,6 +64,55 @@ const struct cpumask *thermal_paused_cpumask(void)
 }
 EXPORT_SYMBOL(thermal_paused_cpumask);
 
+#if IS_ENABLED(CONFIG_SCHED_WALT)
+static int thermal_pause_cpus(struct cpumask *cpus)
+{
+	return walt_pause_cpus(cpus, PAUSE_THERMAL);
+}
+
+static int thermal_resume_cpus(struct cpumask *cpus)
+{
+	return walt_resume_cpus(cpus, PAUSE_THERMAL);
+}
+#else
+/*
+ * Without WALT there is no CPU pause API; walt_pause_cpus() is a stub that
+ * does nothing. Take the CPUs offline instead so this cooling device still
+ * mitigates. CPU0 and the last online CPU are never taken down.
+ */
+static int thermal_pause_cpus(struct cpumask *cpus)
+{
+	unsigned int cpu;
+	int ret = 0, err;
+
+	for_each_cpu(cpu, cpus) {
+		if (!cpu || !cpu_online(cpu) || num_online_cpus() <= 1)
+			continue;
+		err = remove_cpu(cpu);
+		if (err && !ret)
+			ret = err;
+	}
+
+	return ret;
+}
+
+static int thermal_resume_cpus(struct cpumask *cpus)
+{
+	unsigned int cpu;
+	int ret = 0, err;
+
+	for_each_cpu(cpu, cpus) {
+		if (cpu_online(cpu))
+			continue;
+		err = add_cpu(cpu);
+		if (err && !ret)
+			ret = err;
+	}
+
+	return ret;
+}
+#endif
+
 static int thermal_pause_hp_online(unsigned int online_cpu)
 {
 	struct thermal_pause_cdev *thermal_pause_cdev;
@@ -103,7 +152,7 @@ static int thermal_pause_work(struct thermal_pause_cdev *thermal_pause_cdev)
 	pr_debug("Pause:%*pbl\n", cpumask_pr_args(&thermal_pause_cdev->cpu_mask));
 
 	mutex_unlock(&cpus_pause_lock);
-	ret = walt_pause_cpus(&cpus_to_pause, PAUSE_THERMAL);
+	ret = thermal_pause_cpus(&cpus_to_pause);
 	mutex_lock(&cpus_pause_lock);
 
 	if (ret == 0) {
@@ -150,7 +199,7 @@ static int thermal_resume_work(struct thermal_pause_cdev *thermal_pause_cdev)
 	pr_debug("Unpause:%*pbl\n", cpumask_pr_args(&cpus_to_unpause));
 
 	mutex_unlock(&cpus_pause_lock);
-	ret = walt_resume_cpus(&cpus_to_unpause, PAUSE_THERMAL);
+	ret = thermal_resume_cpus(&cpus_to_unpause);
 	mutex_lock(&cpus_pause_lock);
 
 	if (ret == 0) {
