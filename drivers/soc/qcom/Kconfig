@@ -693,6 +693,13 @@ config MINIDUMP_ALL_TASK_INFO
 
 source "drivers/soc/qcom/dcvs/Kconfig"
 
+config QCOM_CX_IPEAK
+	tristate "Qualcomm Technologies, Inc. CX iPeak driver"
+	depends on ARCH_QCOM
+	help
+	  Enable CX iPeak hardware peak-current coordination across multimedia
+	  and compute subsystems on Qualcomm Technologies, Inc. SoCs.
+
 config QCOM_LOGBUF_VENDOR_HOOKS
 	tristate "QTI Logbuf Vendor Hooks Support"
 	depends on ARCH_QCOM

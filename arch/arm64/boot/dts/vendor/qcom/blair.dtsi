@@ -1491,6 +1491,13 @@
 				   "feat_conf9";
 	};
 
+	cx_ipeak: cx_ipeak@3ed000 {
+		#size-cells = <1>;
+		compatible = "qcom,cx-ipeak-v2";
+		reg = <0x3ed000 0xe010>;
+		status = "ok";
+	};
+
 	msm_gpu: qcom,kgsl-3d0@5900000 { };
 
 	cpufreq_hw: qcom,cpufreq-hw {

@@ -21,17 +21,18 @@
 		status = "disabled";
 	};
 
-	gcc_vcodec0_gdsc: qcom,gdsc@1458098 {
-		compatible = "qcom,gdsc";
-		reg = <0x1458098 0x4>;
-		regulator-name = "gcc_vcodec0_gdsc";
-		status = "disabled";
-	};
-
 	gcc_venus_gdsc: qcom,gdsc@145807c {
 		compatible = "qcom,gdsc";
 		reg = <0x145807c 0x4>;
 		regulator-name = "gcc_venus_gdsc";
+		status = "disabled";
+	};
+
+	gcc_vcodec0_gdsc: qcom,gdsc@1458098 {
+		compatible = "qcom,gdsc";
+		reg = <0x1458098 0x4>;
+		regulator-name = "gcc_vcodec0_gdsc";
+		parent-supply = <&gcc_venus_gdsc>;
 		status = "disabled";
 	};
 
